@@ -164,30 +164,18 @@ footer{color:var(--muted);font-size:12px;text-align:center}
 </style>
 </head>
 <body>
-<div class="login" id="login" hidden>
-  <form id="login-form" novalidate>
-    <div><small style="font:600 11px var(--f-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Controle de materiais</small>
-    <h1>Entrega de Kits PROPAG</h1></div>
-    <p>Entre com o e-mail e a senha cadastrados pela coordenação.</p>
-    <label>E-mail<input id="lg-email" type="email" autocomplete="username" required></label>
-    <label>Senha<input id="lg-senha" type="password" autocomplete="current-password" required></label>
-    <button type="submit" class="primary" id="lg-btn">Entrar</button>
-    <p class="err" id="lg-err" hidden></p>
-  </form>
-</div>
-<div class="wrap" id="app" hidden>
+<div class="wrap" id="app">
   <header class="top">
     <div class="brand">
-      <small>Controle de materiais · <span class="ver">Versão 3.0</span></small>
+      <small>Controle de materiais · <span class="ver">Versão 3.1</span></small>
       <h1>Entrega de Kits PROPAG</h1>
       <p id="today-line">Turmas em ordem de prioridade pela data de início.</p>
-      <div class="who"><i class="live" id="live" title="Conexão em tempo real"></i><span id="who-txt">Conectando…</span></div>
+      <div class="who"><i class="live" id="live" title="Conexão em tempo real"></i><span id="who-txt">Conectando ao banco de dados…</span></div>
     </div>
     <div class="actions">
       <button id="btn-import" type="button" title="Carregar uma planilha .xlsx com as colunas Curso, Grupo, Data de Início e Turno">Importar planilha</button>
       <button id="btn-export" type="button" title="Baixar um arquivo com todas as turmas e status">Baixar backup</button>
       <button id="btn-theme" type="button" aria-label="Alternar tema claro ou escuro">Tema</button>
-      <button id="btn-logout" type="button">Sair</button>
       <input id="file-xlsx" type="file" accept=".xlsx,.xls,.csv" hidden>
     </div>
   </header>
@@ -245,7 +233,7 @@ footer{color:var(--muted);font-size:12px;text-align:center}
     <div class="done-body"><div class="grid" id="done-grid"></div></div>
   </details>
 
-  <footer>Versão 3.0 (25/11/2026): dados salvos no banco de dados e compartilhados com a equipe em tempo real.</footer>
+  <footer>Versão 3.1 (25/11/2026): dados salvos no banco de dados e sincronizados entre aparelhos em tempo real.</footer>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -266,7 +254,7 @@ function load(k,fb){try{const v=localStorage.getItem(k);return v?JSON.parse(v):f
 function save(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-let turmas=[], user=null, canal=null, filtro={q:"",curso:"",turno:"",st:""};
+let turmas=[], canal=null, filtro={q:"",curso:"",turno:"",st:""};
 
 function hoje(){const d=new Date();d.setHours(0,0,0,0);return d}
 function parseISO(s){const [y,m,d]=String(s).slice(0,10).split("-").map(Number);return new Date(y,m-1,d)}
@@ -287,36 +275,13 @@ function ordenar(a,b){
 let tt;function toast(m){const el=$("#toast");el.textContent=m;el.classList.add("show");clearTimeout(tt);tt=setTimeout(()=>el.classList.remove("show"),3000)}
 function falha(err,acao){console.error(err);toast(`Não foi possível ${acao}. Verifique a internet e tente de novo.`)}
 
-/* ===== Login ===== */
-async function iniciar(){
-  const {data:{session}}=await sb.auth.getSession();
-  mostrar(session);
-  sb.auth.onAuthStateChange((_e,s)=>mostrar(s));
-}
-function mostrar(session){
-  const novo=session?.user||null;
-  if(novo&&user&&novo.id===user.id) return;
-  user=novo;
-  $("#login").hidden=!!user; $("#app").hidden=!user;
-  if(user){$("#who-txt").innerHTML=`Conectado como <b>${esc(user.email)}</b>`;carregar();assinar()}
-  else{turmas=[];if(canal){sb.removeChannel(canal);canal=null}setTimeout(()=>$("#lg-email").focus(),50)}
-}
-$("#login-form").addEventListener("submit",async e=>{
-  e.preventDefault();
-  const err=$("#lg-err"),btn=$("#lg-btn");err.hidden=true;
-  const email=$("#lg-email").value.trim(),password=$("#lg-senha").value;
-  if(!email||!password){err.textContent="Preencha e-mail e senha.";err.hidden=false;return}
-  btn.disabled=true;btn.textContent="Entrando…";
-  const {error}=await sb.auth.signInWithPassword({email,password});
-  btn.disabled=false;btn.textContent="Entrar";
-  if(error){err.textContent=/invalid/i.test(error.message)?"E-mail ou senha incorretos.":"Não foi possível entrar. Verifique a internet e tente de novo.";err.hidden=false}
-  else $("#lg-senha").value="";
-});
-$("#btn-logout").addEventListener("click",()=>sb.auth.signOut());
+/* ===== Início (sem login) ===== */
+function iniciar(){carregar();assinar()}
 
 /* ===== Dados ===== */
 async function carregar(){
   const {data,error}=await sb.from("turmas").select("*").order("inicio");
+  $("#who-txt").textContent=error?"Sem conexão com o banco de dados":"Salvo no banco de dados";
   if(error){$("#queue").innerHTML=`<div class="empty">Não foi possível carregar as turmas. Recarregue a página.</div>`;return falha(error,"carregar as turmas")}
   turmas=data;render();
 }
@@ -327,7 +292,7 @@ function assinar(){
     .on("postgres_changes",{event:"*",schema:"public",table:"turmas"},()=>{clearTimeout(recarga);recarga=setTimeout(carregar,300)})
     .subscribe(st=>{$("#live").classList.toggle("on",st==="SUBSCRIBED");$("#live").title=st==="SUBSCRIBED"?"Atualizando em tempo real":"Sem conexão em tempo real"});
 }
-document.addEventListener("visibilitychange",()=>{if(!document.hidden&&user)carregar()});
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)carregar()});
 
 /* ===== Interface ===== */
 function cardHTML(t,prio){
@@ -387,9 +352,9 @@ function render(){
 async function setStatus(id,st){
   const t=turmas.find(x=>x.id===id);if(!t)return;
   const antes={...t};
-  Object.assign(t,{status:st,status_em:st==="pendente"?null:new Date().toISOString(),atualizado_por:user.email});
+  Object.assign(t,{status:st,status_em:st==="pendente"?null:new Date().toISOString()});
   render();
-  const {error}=await sb.from("turmas").update({status:t.status,status_em:t.status_em,atualizado_por:t.atualizado_por}).eq("id",id);
+  const {error}=await sb.from("turmas").update({status:t.status,status_em:t.status_em}).eq("id",id);
   if(error){Object.assign(t,antes);render();return falha(error,"salvar o status")}
   if(st==="entregue") toast(`${t.curso} ${t.grupo} movida para "Kits entregues"`);
 }
@@ -397,7 +362,7 @@ const notaTimers={};
 function salvarNota(id,valor){
   const t=turmas.find(x=>x.id===id);if(t)t.nota=valor;
   clearTimeout(notaTimers[id]);
-  notaTimers[id]=setTimeout(async()=>{const {error}=await sb.from("turmas").update({nota:valor,atualizado_por:user.email}).eq("id",id);if(error)falha(error,"salvar a observação")},700);
+  notaTimers[id]=setTimeout(async()=>{const {error}=await sb.from("turmas").update({nota:valor}).eq("id",id);if(error)falha(error,"salvar a observação")},700);
 }
 document.addEventListener("change",e=>{const el=e.target;if(el.matches('.status input[type="radio"]'))setStatus(el.dataset.id,el.value)});
 document.addEventListener("input",e=>{const el=e.target;if(el.matches("textarea[data-note]"))salvarNota(el.dataset.note,el.value)});

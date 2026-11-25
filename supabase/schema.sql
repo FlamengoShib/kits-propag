@@ -15,22 +15,18 @@ create table if not exists public.turmas (
   unique (curso, grupo, turno)
 );
 
--- Libera a tabela na API só para usuários logados (visitantes sem login não têm acesso)
-grant usage on schema public to authenticated;
-grant select, insert, update, delete on public.turmas to authenticated;
-revoke all on public.turmas from anon;
-
--- Só usuários logados (a equipe) podem ver e alterar
+-- Acesso pelo app sem login (uso individual)
+grant usage on schema public to anon, authenticated;
+grant select, insert, update, delete on public.turmas to anon, authenticated;
 alter table public.turmas enable row level security;
-
-drop policy if exists "equipe pode ler" on public.turmas;
-drop policy if exists "equipe pode adicionar" on public.turmas;
-drop policy if exists "equipe pode alterar" on public.turmas;
-drop policy if exists "equipe pode remover" on public.turmas;
-create policy "equipe pode ler"       on public.turmas for select to authenticated using (true);
-create policy "equipe pode adicionar" on public.turmas for insert to authenticated with check (true);
-create policy "equipe pode alterar"   on public.turmas for update to authenticated using (true) with check (true);
-create policy "equipe pode remover"   on public.turmas for delete to authenticated using (true);
+drop policy if exists "app pode ler" on public.turmas;
+drop policy if exists "app pode adicionar" on public.turmas;
+drop policy if exists "app pode alterar" on public.turmas;
+drop policy if exists "app pode remover" on public.turmas;
+create policy "app pode ler"       on public.turmas for select to anon, authenticated using (true);
+create policy "app pode adicionar" on public.turmas for insert to anon, authenticated with check (true);
+create policy "app pode alterar"   on public.turmas for update to anon, authenticated using (true) with check (true);
+create policy "app pode remover"   on public.turmas for delete to anon, authenticated using (true);
 
 -- Atualização em tempo real entre aparelhos
 do $$ begin
