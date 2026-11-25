@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Kits PROPAG</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@500&display=swap">
 <style>
@@ -143,26 +144,51 @@ details.add[open]>summary .plus{transform:rotate(45deg)}
 .del:hover{border-color:var(--bad-line);color:var(--bad)}
 .del.armed{background:var(--bad);border-color:var(--bad);color:#fff}
 .ver{color:var(--accent);letter-spacing:.08em}
+.login{position:fixed;inset:0;z-index:30;background:var(--bg);display:grid;place-items:center;
+  padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.login form{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:26px;display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow)}
+.login h1{font-size:24px}
+.login p{margin:0;color:var(--muted)}
+.login label{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:600;color:var(--muted)}
+.login input{font:500 15px var(--f-body);color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:11px 12px}
+.login button{justify-content:center;padding:12px}
+.login .err{color:var(--bad);font-size:13px;font-weight:600;margin:0}
+.who{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.who b{color:var(--fg);font-weight:600}
+.live{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block}
+.live.on{background:var(--ok)}
+.loading{color:var(--muted);text-align:center;padding:30px}
 footer{color:var(--muted);font-size:12px;text-align:center}
 @media (max-width:720px){.summary{grid-template-columns:repeat(2,minmax(0,1fr))}.brand h1{font-size:23px}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
-<div class="wrap">
+<div class="login" id="login" hidden>
+  <form id="login-form" novalidate>
+    <div><small style="font:600 11px var(--f-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Controle de materiais</small>
+    <h1>Entrega de Kits PROPAG</h1></div>
+    <p>Entre com o e-mail e a senha cadastrados pela coordenação.</p>
+    <label>E-mail<input id="lg-email" type="email" autocomplete="username" required></label>
+    <label>Senha<input id="lg-senha" type="password" autocomplete="current-password" required></label>
+    <button type="submit" class="primary" id="lg-btn">Entrar</button>
+    <p class="err" id="lg-err" hidden></p>
+  </form>
+</div>
+<div class="wrap" id="app" hidden>
   <header class="top">
     <div class="brand">
-      <small>Controle de materiais · <span class="ver">Versão 2.0</span></small>
+      <small>Controle de materiais · <span class="ver">Versão 3.0</span></small>
       <h1>Entrega de Kits PROPAG</h1>
       <p id="today-line">Turmas em ordem de prioridade pela data de início.</p>
+      <div class="who"><i class="live" id="live" title="Conexão em tempo real"></i><span id="who-txt">Conectando…</span></div>
     </div>
     <div class="actions">
       <button id="btn-import" type="button" title="Carregar uma planilha .xlsx com as colunas Curso, Grupo, Data de Início e Turno">Importar planilha</button>
-      <button id="btn-export" type="button" title="Salvar um arquivo de backup com todos os status">Exportar backup</button>
-      <button id="btn-restore" type="button" title="Restaurar um backup .json salvo anteriormente">Restaurar backup</button>
+      <button id="btn-export" type="button" title="Baixar um arquivo com todas as turmas e status">Baixar backup</button>
       <button id="btn-theme" type="button" aria-label="Alternar tema claro ou escuro">Tema</button>
+      <button id="btn-logout" type="button">Sair</button>
       <input id="file-xlsx" type="file" accept=".xlsx,.xls,.csv" hidden>
-      <input id="file-json" type="file" accept=".json,application/json" hidden>
     </div>
   </header>
 
@@ -211,7 +237,7 @@ footer{color:var(--muted);font-size:12px;text-align:center}
       <h2 id="h-fila">Fila de prioridade</h2>
       <span class="hint">Turmas que já começaram aparecem primeiro. Marque "Entregue" para mover a turma para os concluídos.</span>
     </div>
-    <div id="queue" style="display:flex;flex-direction:column;gap:22px"></div>
+    <div id="queue" style="display:flex;flex-direction:column;gap:22px"><div class="loading">Carregando turmas…</div></div>
   </section>
 
   <details class="done" id="done-box">
@@ -219,70 +245,31 @@ footer{color:var(--muted);font-size:12px;text-align:center}
     <div class="done-body"><div class="grid" id="done-grid"></div></div>
   </details>
 
-  <div id="reset-zone" style="display:flex;justify-content:center">
-    <button id="btn-reset" type="button" class="danger-txt">Limpar todos os status</button>
-  </div>
-
-  <footer>Versão 2.0 (25/11/2026): adicionar e remover turmas. Os status ficam salvos neste navegador. Use "Exportar backup" para levar os dados para outro computador.</footer>
+  <footer>Versão 3.0 (25/11/2026): dados salvos no banco de dados e compartilhados com a equipe em tempo real.</footer>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
 (function(){
 "use strict";
-const KEY_STATE="propag-kits:status:v1", KEY_DATA="propag-kits:turmas:v1", KEY_THEME="propag-kits:tema";
-
-/* Dados da planilha PROPAG.xlsx (Planilha1) */
-const DEFAULT_DATA=[
-["Técnico em Administração","2026.3P","2026-10-05","Tarde"],
-["Técnico em Administração","2026.5P","2026-10-05","Manhã"],
-["Técnico em Administração","2026.1P","2026-10-19","Tarde"],
-["Técnico em Administração","2026.2P","2026-10-19","Manhã"],
-["Técnico em Administração","2026.4P","2026-10-19","Noite"],
-["Técnico em Logística","2026.1P","2026-10-19","Noite"],
-["Técnico em Enfermagem","2026.1P","2026-10-19","Tarde"],
-["Técnico em Estética","2026.1P","2026-10-19","Manhã"],
-["Técnico em Estética","2026.2P","2026-10-26","Tarde"],
-["Técnico em Enfermagem","2026.2P","2026-11-03","Tarde"],
-["Técnico em Massoterapia","2026.1P","2026-11-03","Manhã"],
-["Técnico em Enfermagem","2026.4P","2026-11-03","Manhã"],
-["Técnico em Estética","2026.3P","2026-11-03","Noite"],
-["Técnico em Massoterapia","2026.3P","2026-11-03","Noite"],
-["Técnico em Logística","2026.5P","2026-11-09","Noite"],
-["Técnico em Enfermagem","2026.3P","2026-11-16","Tarde"],
-["Técnico em Massoterapia","2026.2P","2026-11-16","Tarde"],
-["Técnico em Logística","2026.9P","2026-11-30","Tarde"],
-["Técnico em Logística","2026.4P","2026-11-30","Tarde"],
-["Técnico em Administração","2026.9P","2026-11-23","Noite"],
-["Técnico em Administração","2026.10P","2026-11-23","Noite"],
-["Técnico em Administração","2026.11P","2026-11-23","Noite"],
-["Técnico em Logística","2026.8P","2026-11-23","Noite"],
-["Técnico em Administração","2026.6P","2026-11-30","Tarde"],
-["Técnico em Administração","2026.13P","2026-11-30","Manhã"],
-["Técnico em Administração","2026.14P","2026-11-30","Tarde"],
-["Técnico em Administração","2026.15P","2026-11-30","Noite"],
-["Técnico em Administração","2026.7P","2026-11-30","Noite"],
-["Técnico em Administração","2026.8P","2026-11-30","Noite"],
-["Técnico em Administração","2026.12","2026-11-30","Manhã"]
-].map(([curso,grupo,inicio,turno])=>({curso,grupo,inicio,turno}));
+/* ===== Configuração do Supabase ===== */
+const SUPABASE_URL="https://rvoefiuxvydrweudmcvf.supabase.co";
+const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ2b2VmaXV4dnlkcndldWRtY3ZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU2NDU5NzYsImV4cCI6MjExMTIyMTk3Nn0.qsMtDDIPgstnvocMH0ECZRGSMHhJXEPZYVZv0bBDILg";
+const KEY_THEME="propag-kits:tema";
 
 const STATUS={pendente:"Aguardando",parcial:"Parcial",entregue:"Entregue"};
 const TURNO_ORDEM={"manhã":0,"manha":0,"tarde":1,"noite":2};
-
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const grupoNum=g=>{const m=String(g).match(/\.(\d+)/);return m?+m[1]:0};
 function load(k,fb){try{const v=localStorage.getItem(k);return v?JSON.parse(v):fb}catch(e){return fb}}
 function save(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 
-let turmas=load(KEY_DATA,null)||DEFAULT_DATA;
-let state=load(KEY_STATE,{});
-let filtro={q:"",curso:"",turno:"",st:""};
-
-const $=s=>document.querySelector(s);
-const idOf=t=>[t.curso,t.grupo,t.turno].join("|").toLowerCase();
-const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const grupoNum=g=>{const m=String(g).match(/\.(\d+)/);return m?+m[1]:0};
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+let turmas=[], user=null, canal=null, filtro={q:"",curso:"",turno:"",st:""};
 
 function hoje(){const d=new Date();d.setHours(0,0,0,0);return d}
-function parseISO(s){const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)}
+function parseISO(s){const [y,m,d]=String(s).slice(0,10).split("-").map(Number);return new Date(y,m-1,d)}
 const fmtData=new Intl.DateTimeFormat("pt-BR",{weekday:"short",day:"2-digit",month:"short",year:"numeric"});
 const fmtCurta=new Intl.DateTimeFormat("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
 function diasAte(iso){return Math.round((parseISO(iso)-hoje())/864e5)}
@@ -292,32 +279,74 @@ function relTxt(n){
   if(n<=7) return {t:`Começa em ${n} dia${n===1?"":"s"}`,c:"soon"};
   return {t:`Começa em ${n} dias`,c:""};
 }
-
 function ordenar(a,b){
   return a.inicio.localeCompare(b.inicio)
-    || (TURNO_ORDEM[a.turno.toLowerCase()]??9)-(TURNO_ORDEM[b.turno.toLowerCase()]??9)
-    || a.curso.localeCompare(b.curso,"pt-BR")
-    || grupoNum(a.grupo)-grupoNum(b.grupo);
+    || (TURNO_ORDEM[(a.turno||"").toLowerCase()]??9)-(TURNO_ORDEM[(b.turno||"").toLowerCase()]??9)
+    || a.curso.localeCompare(b.curso,"pt-BR") || grupoNum(a.grupo)-grupoNum(b.grupo);
 }
-function stOf(t){return (state[idOf(t)]||{}).status||"pendente"}
+let tt;function toast(m){const el=$("#toast");el.textContent=m;el.classList.add("show");clearTimeout(tt);tt=setTimeout(()=>el.classList.remove("show"),3000)}
+function falha(err,acao){console.error(err);toast(`Não foi possível ${acao}. Verifique a internet e tente de novo.`)}
 
+/* ===== Login ===== */
+async function iniciar(){
+  const {data:{session}}=await sb.auth.getSession();
+  mostrar(session);
+  sb.auth.onAuthStateChange((_e,s)=>mostrar(s));
+}
+function mostrar(session){
+  const novo=session?.user||null;
+  if(novo&&user&&novo.id===user.id) return;
+  user=novo;
+  $("#login").hidden=!!user; $("#app").hidden=!user;
+  if(user){$("#who-txt").innerHTML=`Conectado como <b>${esc(user.email)}</b>`;carregar();assinar()}
+  else{turmas=[];if(canal){sb.removeChannel(canal);canal=null}setTimeout(()=>$("#lg-email").focus(),50)}
+}
+$("#login-form").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const err=$("#lg-err"),btn=$("#lg-btn");err.hidden=true;
+  const email=$("#lg-email").value.trim(),password=$("#lg-senha").value;
+  if(!email||!password){err.textContent="Preencha e-mail e senha.";err.hidden=false;return}
+  btn.disabled=true;btn.textContent="Entrando…";
+  const {error}=await sb.auth.signInWithPassword({email,password});
+  btn.disabled=false;btn.textContent="Entrar";
+  if(error){err.textContent=/invalid/i.test(error.message)?"E-mail ou senha incorretos.":"Não foi possível entrar. Verifique a internet e tente de novo.";err.hidden=false}
+  else $("#lg-senha").value="";
+});
+$("#btn-logout").addEventListener("click",()=>sb.auth.signOut());
+
+/* ===== Dados ===== */
+async function carregar(){
+  const {data,error}=await sb.from("turmas").select("*").order("inicio");
+  if(error){$("#queue").innerHTML=`<div class="empty">Não foi possível carregar as turmas. Recarregue a página.</div>`;return falha(error,"carregar as turmas")}
+  turmas=data;render();
+}
+let recarga;
+function assinar(){
+  if(canal) return;
+  canal=sb.channel("turmas-live")
+    .on("postgres_changes",{event:"*",schema:"public",table:"turmas"},()=>{clearTimeout(recarga);recarga=setTimeout(carregar,300)})
+    .subscribe(st=>{$("#live").classList.toggle("on",st==="SUBSCRIBED");$("#live").title=st==="SUBSCRIBED"?"Atualizando em tempo real":"Sem conexão em tempo real"});
+}
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&user)carregar()});
+
+/* ===== Interface ===== */
 function cardHTML(t,prio){
-  const id=idOf(t), s=state[id]||{}, st=s.status||"pendente", key=id.replace(/[^a-z0-9]/g,"_");
+  const st=t.status||"pendente", key=t.id;
   const radios=Object.entries(STATUS).map(([v,l])=>`
-    <input type="radio" name="st_${key}" id="st_${key}_${v}" value="${v}" ${st===v?"checked":""} data-id="${esc(id)}">
+    <input type="radio" name="st_${key}" id="st_${key}_${v}" value="${v}" ${st===v?"checked":""} data-id="${key}">
     <label for="st_${key}_${v}"><span class="box"></span>${l}</label>`).join("");
   const nota= st==="parcial" ? `<label class="note"><span>O que falta entregar?</span>
-     <textarea id="nt_${key}" data-note="${esc(id)}" placeholder="Ex.: faltam 5 apostilas e 2 jalecos">${esc(s.nota||"")}</textarea></label>`
-     : (st==="entregue" && s.nota ? `<div class="stamp">Obs.: ${esc(s.nota)}</div>`:"");
-  const stamp= s.em && st!=="pendente" ? `<div class="stamp">${STATUS[st]} em ${fmtCurta.format(new Date(s.em))}</div>`:"";
+     <textarea id="nt_${key}" data-note="${key}" placeholder="Ex.: faltam 5 apostilas e 2 jalecos">${esc(t.nota)}</textarea></label>`
+     : (st==="entregue" && t.nota ? `<div class="stamp">Obs.: ${esc(t.nota)}</div>`:"");
+  const quem=t.atualizado_por?` por ${esc(t.atualizado_por)}`:"";
+  const stamp= t.status_em && st!=="pendente" ? `<div class="stamp">${STATUS[st]} em ${fmtCurta.format(new Date(t.status_em))}${quem}</div>`:"";
   return `<article class="card s-${st}">
-    <div class="card-top"><h3>${esc(t.curso)}</h3><div class="card-tools">${prio?`<span class="prio">#${prio}</span>`:""}<button type="button" class="del" data-del="${esc(id)}" aria-label="Remover turma">Remover</button></div></div>
-    <div class="meta"><span class="tag mono">${esc(t.grupo)}</span><span class="tag">${esc(t.turno)}</span><span class="tag">Início ${parseISO(t.inicio).toLocaleDateString("pt-BR")}</span></div>
+    <div class="card-top"><h3>${esc(t.curso)}</h3><div class="card-tools">${prio?`<span class="prio">#${prio}</span>`:""}<button type="button" class="del" data-del="${key}" aria-label="Remover turma">Remover</button></div></div>
+    <div class="meta"><span class="tag mono">${esc(t.grupo)}</span>${t.turno?`<span class="tag">${esc(t.turno)}</span>`:""}<span class="tag">Início ${parseISO(t.inicio).toLocaleDateString("pt-BR")}</span></div>
     <div class="status" role="radiogroup" aria-label="Status do kit">${radios}</div>
     ${nota}${stamp}
   </article>`;
 }
-
 function passa(t){
   const q=filtro.q.trim().toLowerCase();
   if(q && !(t.curso+" "+t.grupo+" "+t.turno).toLowerCase().includes(q)) return false;
@@ -325,75 +354,82 @@ function passa(t){
   if(filtro.turno && t.turno!==filtro.turno) return false;
   return true;
 }
-
 function render(){
+  const ativo=document.activeElement, ativoId=ativo&&ativo.id, selS=ativo&&ativo.selectionStart, selE=ativo&&ativo.selectionEnd;
   const all=[...turmas].sort(ordenar);
-  const c={pendente:0,parcial:0,entregue:0};
-  all.forEach(t=>c[stOf(t)]++);
-  $("#n-all").textContent=all.length; $("#n-pend").textContent=c.pendente; $("#n-parc").textContent=c.parcial; $("#n-ok").textContent=c.entregue;
-  const tot=all.length||1;
-  $("#bar-ok").style.width=(c.entregue/tot*100)+"%"; $("#bar-warn").style.width=(c.parcial/tot*100)+"%";
-
-  const abertas=all.filter(t=>stOf(t)!=="entregue");
-  const prioMap=new Map(abertas.map((t,i)=>[idOf(t),i+1]));
-  const fila=abertas.filter(t=>passa(t)&&(!filtro.st||stOf(t)===filtro.st));
-
-  const porDia=new Map();
-  fila.forEach(t=>{if(!porDia.has(t.inicio))porDia.set(t.inicio,[]);porDia.get(t.inicio).push(t)});
+  const c={pendente:0,parcial:0,entregue:0};all.forEach(t=>c[t.status]=(c[t.status]||0)+1);
+  $("#n-all").textContent=all.length;$("#n-pend").textContent=c.pendente;$("#n-parc").textContent=c.parcial;$("#n-ok").textContent=c.entregue;
+  const tot=all.length||1;$("#bar-ok").style.width=(c.entregue/tot*100)+"%";$("#bar-warn").style.width=(c.parcial/tot*100)+"%";
+  const abertas=all.filter(t=>t.status!=="entregue");
+  const prioMap=new Map(abertas.map((t,i)=>[t.id,i+1]));
+  const fila=abertas.filter(t=>passa(t)&&(!filtro.st||t.status===filtro.st));
+  const porDia=new Map();fila.forEach(t=>{if(!porDia.has(t.inicio))porDia.set(t.inicio,[]);porDia.get(t.inicio).push(t)});
   let html="";
-  porDia.forEach((lista,dia)=>{
-    const r=relTxt(diasAte(dia));
+  porDia.forEach((lista,dia)=>{const r=relTxt(diasAte(dia));
     html+=`<div class="day"><div class="day-head"><span class="date">${fmtData.format(parseISO(dia))}</span>
       <span class="rel ${r.c}">${r.t}</span><span class="line"></span><span class="cnt">${lista.length} turma${lista.length>1?"s":""}</span></div>
-      <div class="grid">${lista.map(t=>cardHTML(t,prioMap.get(idOf(t)))).join("")}</div></div>`;
-  });
-  if(!html){
-    html= abertas.length===0
-      ? `<div class="empty"><strong>Todos os kits foram entregues.</strong><br>As turmas estão na seção "Kits entregues" abaixo.</div>`
-      : `<div class="empty">Nenhuma turma corresponde aos filtros.</div>`;
-  }
+      <div class="grid">${lista.map(t=>cardHTML(t,prioMap.get(t.id))).join("")}</div></div>`});
+  if(!html) html= all.length===0?`<div class="empty">Nenhuma turma cadastrada. Use "Adicionar turma" ou "Importar planilha".</div>`
+    : abertas.length===0?`<div class="empty"><strong>Todos os kits foram entregues.</strong><br>As turmas estão na seção "Kits entregues" abaixo.</div>`
+    : `<div class="empty">Nenhuma turma corresponde aos filtros.</div>`;
   $("#queue").innerHTML=html;
-
-  const feitas=all.filter(t=>stOf(t)==="entregue"&&passa(t));
+  const feitas=all.filter(t=>t.status==="entregue"&&passa(t));
   $("#done-count").textContent=all.length-abertas.length;
   $("#done-grid").innerHTML=feitas.length?feitas.map(t=>cardHTML(t,0)).join(""):`<div class="empty" style="grid-column:1/-1">Nenhum kit entregue ainda.</div>`;
-
   const cursos=[...new Set(all.map(t=>t.curso))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
   $("#lista-cursos").innerHTML=cursos.map(x=>`<option value="${esc(x)}">`).join("");
-  const sel=$("#f-curso"), cur=sel.value;
+  const sel=$("#f-curso"),cur=sel.value;
   sel.innerHTML=`<option value="">Todos os cursos</option>`+cursos.map(x=>`<option ${x===cur?"selected":""}>${esc(x)}</option>`).join("");
+  if(ativoId&&ativoId.startsWith("nt_")){const el=document.getElementById(ativoId);if(el){el.focus();try{el.setSelectionRange(selS,selE)}catch(_){}}}
 }
 
-function setStatus(id,st){
-  const prev=state[id]||{};
-  state[id]={...prev,status:st,em:Date.now()};
-  if(st==="pendente") delete state[id].em;
-  save(KEY_STATE,state);
+/* ===== Ações ===== */
+async function setStatus(id,st){
+  const t=turmas.find(x=>x.id===id);if(!t)return;
+  const antes={...t};
+  Object.assign(t,{status:st,status_em:st==="pendente"?null:new Date().toISOString(),atualizado_por:user.email});
   render();
-  const t=turmas.find(x=>idOf(x)===id);
-  if(st==="entregue"&&t) toast(`${t.curso} ${t.grupo} movida para "Kits entregues"`);
+  const {error}=await sb.from("turmas").update({status:t.status,status_em:t.status_em,atualizado_por:t.atualizado_por}).eq("id",id);
+  if(error){Object.assign(t,antes);render();return falha(error,"salvar o status")}
+  if(st==="entregue") toast(`${t.curso} ${t.grupo} movida para "Kits entregues"`);
 }
+const notaTimers={};
+function salvarNota(id,valor){
+  const t=turmas.find(x=>x.id===id);if(t)t.nota=valor;
+  clearTimeout(notaTimers[id]);
+  notaTimers[id]=setTimeout(async()=>{const {error}=await sb.from("turmas").update({nota:valor,atualizado_por:user.email}).eq("id",id);if(error)falha(error,"salvar a observação")},700);
+}
+document.addEventListener("change",e=>{const el=e.target;if(el.matches('.status input[type="radio"]'))setStatus(el.dataset.id,el.value)});
+document.addEventListener("input",e=>{const el=e.target;if(el.matches("textarea[data-note]"))salvarNota(el.dataset.note,el.value)});
+$("#q").addEventListener("input",e=>{filtro.q=e.target.value;render()});
+$("#f-curso").addEventListener("change",e=>{filtro.curso=e.target.value;render()});
+$("#f-turno").addEventListener("change",e=>{filtro.turno=e.target.value;render()});
+document.querySelectorAll(".chip").forEach(b=>b.addEventListener("click",()=>{filtro.st=b.dataset.st;document.querySelectorAll(".chip").forEach(x=>x.setAttribute("aria-pressed",x===b));render()}));
 
 /* adicionar turma */
-$("#add-form").addEventListener("submit",e=>{
+$("#add-form").addEventListener("input",()=>{$("#add-err").hidden=true});
+$("#add-form").addEventListener("submit",async e=>{
   e.preventDefault();
   const err=$("#add-err");err.hidden=true;
   const t={curso:$("#add-curso").value.trim().replace(/\s+/g," "),grupo:$("#add-grupo").value.trim().toUpperCase(),inicio:$("#add-data").value,turno:$("#add-turno").value};
   const falta=[!t.curso&&"curso",!t.grupo&&"grupo",!t.inicio&&"data de início"].filter(Boolean);
   if(falta.length){err.textContent="Preencha: "+falta.join(", ")+".";err.hidden=false;return}
-  const existente=turmas.find(x=>x.curso.toLowerCase()===t.curso.toLowerCase());
-  if(existente) t.curso=existente.curso;
-  if(turmas.some(x=>idOf(x)===idOf(t))){err.textContent=`${t.curso} ${t.grupo} (${t.turno}) já está cadastrada.`;err.hidden=false;return}
-  turmas=[...turmas,t];save(KEY_DATA,turmas);render();
-  $("#add-grupo").value="";$("#add-grupo").focus();
+  const existente=turmas.find(x=>x.curso.toLowerCase()===t.curso.toLowerCase());if(existente)t.curso=existente.curso;
+  const btn=e.submitter||$("#add-form button[type=submit]");btn.disabled=true;
+  const {data,error}=await sb.from("turmas").insert(t).select().single();
+  btn.disabled=false;
+  if(error){
+    if(error.code==="23505"){err.textContent=`${t.curso} ${t.grupo} (${t.turno}) já está cadastrada.`;err.hidden=false;return}
+    return falha(error,"adicionar a turma");
+  }
+  if(!turmas.some(x=>x.id===data.id))turmas.push(data);
+  render();$("#add-grupo").value="";$("#add-grupo").focus();
   toast(`${t.curso} ${t.grupo} adicionada à fila`);
 });
 
-$("#add-form").addEventListener("input",()=>{$("#add-err").hidden=true});
-
 /* remover turma: primeiro toque arma, segundo confirma */
 let armado=null,armTimer;
-document.addEventListener("click",e=>{
+document.addEventListener("click",async e=>{
   const b=e.target.closest("[data-del]");if(!b)return;
   const id=b.dataset.del;
   if(armado!==id){
@@ -403,53 +439,29 @@ document.addEventListener("click",e=>{
     return;
   }
   armado=null;clearTimeout(armTimer);
-  const t=turmas.find(x=>idOf(x)===id);
-  turmas=turmas.filter(x=>idOf(x)!==id);delete state[id];
-  save(KEY_DATA,turmas);save(KEY_STATE,state);render();
+  const t=turmas.find(x=>x.id===id);
+  const {error}=await sb.from("turmas").delete().eq("id",id);
+  if(error) return falha(error,"remover a turma");
+  turmas=turmas.filter(x=>x.id!==id);render();
   if(t)toast(`${t.curso} ${t.grupo} removida`);
 });
-
-let tt;function toast(m){const el=$("#toast");el.textContent=m;el.classList.add("show");clearTimeout(tt);tt=setTimeout(()=>el.classList.remove("show"),2600)}
-
-document.addEventListener("change",e=>{
-  const el=e.target;
-  if(el.matches('.status input[type="radio"]')) setStatus(el.dataset.id,el.value);
-});
-document.addEventListener("input",e=>{
-  const el=e.target;
-  if(el.matches("textarea[data-note]")){const id=el.dataset.note;state[id]={...(state[id]||{status:"parcial"}),nota:el.value};save(KEY_STATE,state)}
-});
-$("#q").addEventListener("input",e=>{filtro.q=e.target.value;render()});
-$("#f-curso").addEventListener("change",e=>{filtro.curso=e.target.value;render()});
-$("#f-turno").addEventListener("change",e=>{filtro.turno=e.target.value;render()});
-document.querySelectorAll(".chip").forEach(b=>b.addEventListener("click",()=>{
-  filtro.st=b.dataset.st;document.querySelectorAll(".chip").forEach(x=>x.setAttribute("aria-pressed",x===b));render();
-}));
 
 /* tema */
 function applyTheme(t){if(t)document.documentElement.dataset.theme=t;else delete document.documentElement.dataset.theme}
 applyTheme(load(KEY_THEME,""));
 $("#btn-theme").addEventListener("click",()=>{
-  const dark=document.documentElement.dataset.theme? document.documentElement.dataset.theme==="dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  const dark=document.documentElement.dataset.theme?document.documentElement.dataset.theme==="dark":matchMedia("(prefers-color-scheme: dark)").matches;
   const n=dark?"light":"dark";applyTheme(n);save(KEY_THEME,n);
 });
 
-/* backup */
+/* backup em arquivo */
 $("#btn-export").addEventListener("click",()=>{
-  const blob=new Blob([JSON.stringify({app:"propag-kits",versao:2,exportadoEm:new Date().toISOString(),turmas,status:state},null,2)],{type:"application/json"});
+  const blob=new Blob([JSON.stringify({app:"propag-kits",versao:3,exportadoEm:new Date().toISOString(),turmas},null,2)],{type:"application/json"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`kits-propag-${new Date().toISOString().slice(0,10)}.json`;
-  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);toast("Backup exportado");
-});
-$("#btn-restore").addEventListener("click",()=>$("#file-json").click());
-$("#file-json").addEventListener("change",async e=>{
-  const f=e.target.files[0];if(!f)return;
-  try{const d=JSON.parse(await f.text());if(!Array.isArray(d.turmas)||typeof d.status!=="object")throw 0;
-    turmas=d.turmas;state=d.status;save(KEY_DATA,turmas);save(KEY_STATE,state);render();toast("Backup restaurado");}
-  catch(_){toast("Arquivo inválido. Escolha um backup .json exportado por este app.")}
-  e.target.value="";
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);toast("Backup baixado");
 });
 
-/* importar xlsx (SheetJS carregado sob demanda) */
+/* importar planilha: adiciona turmas novas e mantém as existentes */
 function loadXLSX(){return window.XLSX?Promise.resolve():new Promise((ok,err)=>{const s=document.createElement("script");
   s.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";s.onload=ok;s.onerror=err;document.head.appendChild(s)})}
 const norm=s=>String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().trim();
@@ -472,27 +484,19 @@ $("#file-xlsx").addEventListener("change",async e=>{
     if(iC<0||iG<0||iD<0) throw new Error("cols");
     const novas=rows.slice(1).filter(r=>r[iC]&&r[iG]&&r[iD]).map(r=>({curso:String(r[iC]).trim(),grupo:String(r[iG]).trim(),inicio:toISO(r[iD]),turno:iT>=0?String(r[iT]||"").trim():""})).filter(t=>t.inicio);
     if(!novas.length) throw new Error("vazio");
-    turmas=novas;save(KEY_DATA,turmas);render();
-    toast(`${novas.length} turmas importadas. Os status já marcados foram mantidos.`);
+    const {data,error}=await sb.from("turmas").upsert(novas,{onConflict:"curso,grupo,turno",ignoreDuplicates:true}).select();
+    if(error) throw error;
+    await carregar();
+    toast(`${data.length} turma${data.length===1?"":"s"} nova${data.length===1?"":"s"} adicionada${data.length===1?"":"s"}. As já cadastradas foram mantidas.`);
   }catch(err){
-    toast(err&&err.message==="cols"?"A planilha precisa das colunas Curso, Grupo, Data de Início e Turno.":"Não foi possível ler a planilha. Verifique o arquivo e a conexão com a internet.");
+    toast(err&&err.message==="cols"?"A planilha precisa das colunas Curso, Grupo, Data de Início e Turno.":"Não foi possível importar a planilha. Verifique o arquivo e a internet.");
+    if(err&&err.message!=="cols")console.error(err);
   }
   e.target.value="";
 });
 
-/* limpar com confirmação na própria página */
-function askReset(){
-  const z=$("#reset-zone");
-  z.innerHTML=`<div class="confirm">Isso volta todas as turmas para "Aguardando". Confirmar?
-    <button type="button" id="rs-yes" class="primary">Sim, limpar</button><button type="button" id="rs-no">Cancelar</button></div>`;
-  const back=()=>{z.innerHTML=`<button id="btn-reset" type="button" class="danger-txt">Limpar todos os status</button>`;z.querySelector("#btn-reset").addEventListener("click",askReset)};
-  z.querySelector("#rs-no").onclick=back;
-  z.querySelector("#rs-yes").onclick=()=>{state={};save(KEY_STATE,state);render();toast("Status limpos");back()};
-}
-$("#btn-reset").addEventListener("click",askReset);
-
 $("#today-line").textContent=`Turmas em ordem de prioridade pela data de início · Hoje: ${hoje().toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"})}`;
-render();
+iniciar();
 })();
 </script>
 </body>
