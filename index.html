@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kits PROPAG</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: barra de resumo no topo, fila de prioridade agrupada por data de início, área de concluídos recolhível no fim */
+:root{
+  --bg:#f3f5f8; --surface:#ffffff; --surface-2:#eaeef4; --fg:#16202e; --muted:#5b6778; --line:#d6dce5;
+  --accent:#1f4fd1; --accent-fg:#ffffff;
+  --ok:#1d8a4e; --ok-bg:#e6f5ec; --ok-line:#a9dcbd;
+  --warn:#a86a00; --warn-bg:#fff5db; --warn-line:#f0d58a;
+  --bad:#c23434; --bad-bg:#fdeaea; --bad-line:#f1b7b7;
+  --shadow:0 1px 2px rgba(16,32,60,.06),0 4px 14px rgba(16,32,60,.05);
+  --f-display:"Space Grotesk",system-ui,sans-serif;
+  --f-body:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f141c; --surface:#171e29; --surface-2:#1f2835; --fg:#e6ebf2; --muted:#93a0b3; --line:#2b3646;
+  --accent:#6f95ff; --accent-fg:#0b1020;
+  --ok:#4fcf86; --ok-bg:#12291d; --ok-line:#22573a;
+  --warn:#f2c14e; --warn-bg:#2c2412; --warn-line:#5e4a17;
+  --bad:#ff7a7a; --bad-bg:#2f1517; --bad-line:#6a2a2e;
+  --shadow:0 1px 2px rgba(0,0,0,.3);
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0f141c; --surface:#171e29; --surface-2:#1f2835; --fg:#e6ebf2; --muted:#93a0b3; --line:#2b3646;
+  --accent:#6f95ff; --accent-fg:#0b1020;
+  --ok:#4fcf86; --ok-bg:#12291d; --ok-line:#22573a;
+  --warn:#f2c14e; --warn-bg:#2c2412; --warn-line:#5e4a17;
+  --bad:#ff7a7a; --bad-bg:#2f1517; --bad-line:#6a2a2e;
+  --shadow:0 1px 2px rgba(0,0,0,.3);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 var(--f-body)}
+.wrap{max-width:1180px;margin:0 auto;padding-block:24px 64px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;flex-direction:column;gap:22px}
+h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px}
+.brand small{display:block;font:600 11px/1 var(--f-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.brand h1{font-size:28px;font-weight:700;letter-spacing:-.01em}
+.brand p{margin:4px 0 0;color:var(--muted)}
+.actions{display:flex;flex-wrap:wrap;gap:8px}
+button,.btn{font:600 13px/1 var(--f-body);border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--fg);
+  padding:9px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+button:hover,.btn:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.danger-txt{color:var(--bad)}
+
+/* resumo */
+.summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:4px}
+.stat .lbl{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:6px}
+.stat .num{font:700 28px/1 var(--f-display);font-variant-numeric:tabular-nums}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+.dot.ok{background:var(--ok)}.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}.dot.all{background:var(--accent)}
+.progress{grid-column:1/-1;height:8px;border-radius:99px;background:var(--surface-2);overflow:hidden;display:flex}
+.progress span{height:100%}
+.progress .p-ok{background:var(--ok)}.progress .p-warn{background:var(--warn)}
+
+/* filtros */
+.filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.filters input,.filters select{font:500 13px var(--f-body);color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.filters input{flex:1 1 220px;min-width:0}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-size:12px;padding:7px 10px;border-radius:99px}
+.chip[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+
+/* fila */
+.section-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.section-head h2{font-size:20px}
+.section-head .hint{color:var(--muted);font-size:13px}
+.day{display:flex;flex-direction:column;gap:10px}
+.day-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.day-head .date{font:600 15px var(--f-display)}
+.day-head .rel{font-size:12px;font-weight:600;padding:3px 8px;border-radius:99px;background:var(--surface-2);color:var(--muted)}
+.day-head .rel.late{background:var(--bad-bg);color:var(--bad)}
+.day-head .rel.soon{background:var(--warn-bg);color:var(--warn)}
+.day-head .line{flex:1;height:1px;background:var(--line);min-width:20px}
+.day-head .cnt{font-size:12px;color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px}
+
+.card{background:var(--surface);border:1px solid var(--line);border-left-width:5px;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;box-shadow:var(--shadow);transition:background .2s,border-color .2s}
+.card.s-pendente{background:var(--bad-bg);border-color:var(--bad-line);border-left-color:var(--bad)}
+.card.s-parcial{background:var(--warn-bg);border-color:var(--warn-line);border-left-color:var(--warn)}
+.card.s-entregue{background:var(--ok-bg);border-color:var(--ok-line);border-left-color:var(--ok)}
+.card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.prio{font:500 11px var(--f-mono);color:var(--muted);white-space:nowrap}
+.card h3{font-size:16px;font-weight:600;line-height:1.25}
+.meta{display:flex;flex-wrap:wrap;gap:6px}
+.tag{font-size:12px;font-weight:600;padding:3px 8px;border-radius:6px;background:var(--surface);border:1px solid var(--line);color:var(--fg)}
+.tag.mono{font-family:var(--f-mono);font-weight:500}
+.status{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:3px}
+.status input{position:absolute;opacity:0;pointer-events:none}
+.status label{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-align:center;font-size:12px;font-weight:600;padding:7px 2px;min-width:0;border-radius:6px;cursor:pointer;color:var(--muted);line-height:1.15}
+.status label .box{width:13px;height:13px;border:2px solid currentColor;border-radius:3px;flex:none;display:grid;place-items:center}
+.status input:checked+label .box::after{content:"";width:5px;height:5px;background:currentColor;border-radius:1px}
+.status input:focus-visible+label{outline:2px solid var(--accent);outline-offset:1px}
+.status input[value="pendente"]:checked+label{background:var(--bad);color:#fff}
+.status input[value="parcial"]:checked+label{background:var(--warn);color:#1b1300}
+.status input[value="entregue"]:checked+label{background:var(--ok);color:#fff}
+.note textarea{width:100%;min-height:56px;resize:vertical;font:13px/1.4 var(--f-body);color:var(--fg);background:var(--surface);border:1px solid var(--warn-line);border-radius:8px;padding:8px}
+.note span{display:block;font-size:12px;font-weight:600;color:var(--warn);margin-bottom:4px}
+.stamp{font-size:12px;color:var(--muted)}
+
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:12px;padding:28px;text-align:center;color:var(--muted)}
+
+details.done{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:4px 16px}
+details.done>summary{cursor:pointer;list-style:none;padding:12px 0;display:flex;align-items:center;gap:10px;font:600 18px var(--f-display)}
+details.done>summary::-webkit-details-marker{display:none}
+details.done>summary .chev{transition:transform .2s;color:var(--muted)}
+details.done[open]>summary .chev{transform:rotate(90deg)}
+details.done>summary .badge{font:600 12px var(--f-body);background:var(--ok);color:#fff;border-radius:99px;padding:3px 9px}
+.done-body{padding-bottom:16px}
+
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);opacity:0;
+  background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:600;font-size:13px;transition:.25s;pointer-events:none;z-index:20;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.confirm{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--bad-bg);border:1px solid var(--bad-line);padding:10px 12px;border-radius:10px;font-size:13px}
+details.add{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:4px 16px}
+details.add>summary{cursor:pointer;list-style:none;padding:12px 0;display:flex;align-items:center;gap:10px;font:600 16px var(--f-display)}
+details.add>summary::-webkit-details-marker{display:none}
+details.add>summary .plus{width:24px;height:24px;border-radius:7px;background:var(--accent);color:var(--accent-fg);display:grid;place-items:center;font:700 16px/1 var(--f-body)}
+details.add[open]>summary .plus{transform:rotate(45deg)}
+.add-form{display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:10px;align-items:end;padding-bottom:16px}
+.add-form label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--muted);min-width:0}
+.add-form input,.add-form select{font:500 14px var(--f-body);color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%;min-width:0}
+.add-form button{padding:11px 16px}
+.add-form .err{grid-column:1/-1;color:var(--bad);font-size:13px;font-weight:600;margin:0}
+@media (max-width:720px){.add-form{grid-template-columns:1fr 1fr}.add-form .full{grid-column:1/-1}}
+.card-tools{display:flex;align-items:center;gap:6px}
+.del{font:600 11px/1 var(--f-body);padding:5px 7px;border-radius:6px;background:transparent;border:1px solid transparent;color:var(--muted)}
+.del:hover{border-color:var(--bad-line);color:var(--bad)}
+.del.armed{background:var(--bad);border-color:var(--bad);color:#fff}
+.ver{color:var(--accent);letter-spacing:.08em}
+footer{color:var(--muted);font-size:12px;text-align:center}
+@media (max-width:720px){.summary{grid-template-columns:repeat(2,minmax(0,1fr))}.brand h1{font-size:23px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <small>Controle de materiais · <span class="ver">Versão 2.0</span></small>
+      <h1>Entrega de Kits PROPAG</h1>
+      <p id="today-line">Turmas em ordem de prioridade pela data de início.</p>
+    </div>
+    <div class="actions">
+      <button id="btn-import" type="button" title="Carregar uma planilha .xlsx com as colunas Curso, Grupo, Data de Início e Turno">Importar planilha</button>
+      <button id="btn-export" type="button" title="Salvar um arquivo de backup com todos os status">Exportar backup</button>
+      <button id="btn-restore" type="button" title="Restaurar um backup .json salvo anteriormente">Restaurar backup</button>
+      <button id="btn-theme" type="button" aria-label="Alternar tema claro ou escuro">Tema</button>
+      <input id="file-xlsx" type="file" accept=".xlsx,.xls,.csv" hidden>
+      <input id="file-json" type="file" accept=".json,application/json" hidden>
+    </div>
+  </header>
+
+  <section class="summary" aria-label="Resumo">
+    <div class="stat"><span class="lbl"><i class="dot all"></i>Turmas</span><span class="num" id="n-all">0</span></div>
+    <div class="stat"><span class="lbl"><i class="dot bad"></i>Aguardando</span><span class="num" id="n-pend">0</span></div>
+    <div class="stat"><span class="lbl"><i class="dot warn"></i>Parcial</span><span class="num" id="n-parc">0</span></div>
+    <div class="stat"><span class="lbl"><i class="dot ok"></i>Entregues</span><span class="num" id="n-ok">0</span></div>
+    <div class="progress" aria-hidden="true"><span class="p-ok" id="bar-ok"></span><span class="p-warn" id="bar-warn"></span></div>
+  </section>
+
+  <div class="filters">
+    <input id="q" type="search" placeholder="Buscar curso ou grupo…" aria-label="Buscar">
+    <select id="f-curso" aria-label="Filtrar por curso"><option value="">Todos os cursos</option></select>
+    <select id="f-turno" aria-label="Filtrar por turno"><option value="">Todos os turnos</option><option>Manhã</option><option>Tarde</option><option>Noite</option></select>
+    <div class="chips" role="group" aria-label="Filtrar por status">
+      <button class="chip" type="button" data-st="" aria-pressed="true">Todos</button>
+      <button class="chip" type="button" data-st="pendente" aria-pressed="false">Aguardando</button>
+      <button class="chip" type="button" data-st="parcial" aria-pressed="false">Parcial</button>
+    </div>
+  </div>
+
+  <details class="add" id="add-box">
+    <summary><span class="plus" aria-hidden="true">+</span>Adicionar turma</summary>
+    <form class="add-form" id="add-form" novalidate>
+      <label class="full">Curso
+        <input id="add-curso" list="lista-cursos" placeholder="Ex.: Técnico em Enfermagem" autocomplete="off" required>
+        <datalist id="lista-cursos"></datalist>
+      </label>
+      <label>Grupo
+        <input id="add-grupo" placeholder="Ex.: 2026.6P" autocomplete="off" required>
+      </label>
+      <label>Data de início
+        <input id="add-data" type="date" required>
+      </label>
+      <label>Turno
+        <select id="add-turno"><option>Manhã</option><option>Tarde</option><option>Noite</option></select>
+      </label>
+      <button type="submit" class="primary full">Adicionar</button>
+      <p class="err" id="add-err" hidden></p>
+    </form>
+  </details>
+
+  <section aria-labelledby="h-fila" style="display:flex;flex-direction:column;gap:18px">
+    <div class="section-head">
+      <h2 id="h-fila">Fila de prioridade</h2>
+      <span class="hint">Turmas que já começaram aparecem primeiro. Marque "Entregue" para mover a turma para os concluídos.</span>
+    </div>
+    <div id="queue" style="display:flex;flex-direction:column;gap:22px"></div>
+  </section>
+
+  <details class="done" id="done-box">
+    <summary><span class="chev">▶</span>Kits entregues <span class="badge" id="done-count">0</span></summary>
+    <div class="done-body"><div class="grid" id="done-grid"></div></div>
+  </details>
+
+  <div id="reset-zone" style="display:flex;justify-content:center">
+    <button id="btn-reset" type="button" class="danger-txt">Limpar todos os status</button>
+  </div>
+
+  <footer>Versão 2.0 (25/11/2026): adicionar e remover turmas. Os status ficam salvos neste navegador. Use "Exportar backup" para levar os dados para outro computador.</footer>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+"use strict";
+const KEY_STATE="propag-kits:status:v1", KEY_DATA="propag-kits:turmas:v1", KEY_THEME="propag-kits:tema";
+
+/* Dados da planilha PROPAG.xlsx (Planilha1) */
+const DEFAULT_DATA=[
+["Técnico em Administração","2026.3P","2026-10-05","Tarde"],
+["Técnico em Administração","2026.5P","2026-10-05","Manhã"],
+["Técnico em Administração","2026.1P","2026-10-19","Tarde"],
+["Técnico em Administração","2026.2P","2026-10-19","Manhã"],
+["Técnico em Administração","2026.4P","2026-10-19","Noite"],
+["Técnico em Logística","2026.1P","2026-10-19","Noite"],
+["Técnico em Enfermagem","2026.1P","2026-10-19","Tarde"],
+["Técnico em Estética","2026.1P","2026-10-19","Manhã"],
+["Técnico em Estética","2026.2P","2026-10-26","Tarde"],
+["Técnico em Enfermagem","2026.2P","2026-11-03","Tarde"],
+["Técnico em Massoterapia","2026.1P","2026-11-03","Manhã"],
+["Técnico em Enfermagem","2026.4P","2026-11-03","Manhã"],
+["Técnico em Estética","2026.3P","2026-11-03","Noite"],
+["Técnico em Massoterapia","2026.3P","2026-11-03","Noite"],
+["Técnico em Logística","2026.5P","2026-11-09","Noite"],
+["Técnico em Enfermagem","2026.3P","2026-11-16","Tarde"],
+["Técnico em Massoterapia","2026.2P","2026-11-16","Tarde"],
+["Técnico em Logística","2026.9P","2026-11-30","Tarde"],
+["Técnico em Logística","2026.4P","2026-11-30","Tarde"],
+["Técnico em Administração","2026.9P","2026-11-23","Noite"],
+["Técnico em Administração","2026.10P","2026-11-23","Noite"],
+["Técnico em Administração","2026.11P","2026-11-23","Noite"],
+["Técnico em Logística","2026.8P","2026-11-23","Noite"],
+["Técnico em Administração","2026.6P","2026-11-30","Tarde"],
+["Técnico em Administração","2026.13P","2026-11-30","Manhã"],
+["Técnico em Administração","2026.14P","2026-11-30","Tarde"],
+["Técnico em Administração","2026.15P","2026-11-30","Noite"],
+["Técnico em Administração","2026.7P","2026-11-30","Noite"],
+["Técnico em Administração","2026.8P","2026-11-30","Noite"],
+["Técnico em Administração","2026.12","2026-11-30","Manhã"]
+].map(([curso,grupo,inicio,turno])=>({curso,grupo,inicio,turno}));
+
+const STATUS={pendente:"Aguardando",parcial:"Parcial",entregue:"Entregue"};
+const TURNO_ORDEM={"manhã":0,"manha":0,"tarde":1,"noite":2};
+
+function load(k,fb){try{const v=localStorage.getItem(k);return v?JSON.parse(v):fb}catch(e){return fb}}
+function save(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+
+let turmas=load(KEY_DATA,null)||DEFAULT_DATA;
+let state=load(KEY_STATE,{});
+let filtro={q:"",curso:"",turno:"",st:""};
+
+const $=s=>document.querySelector(s);
+const idOf=t=>[t.curso,t.grupo,t.turno].join("|").toLowerCase();
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const grupoNum=g=>{const m=String(g).match(/\.(\d+)/);return m?+m[1]:0};
+
+function hoje(){const d=new Date();d.setHours(0,0,0,0);return d}
+function parseISO(s){const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)}
+const fmtData=new Intl.DateTimeFormat("pt-BR",{weekday:"short",day:"2-digit",month:"short",year:"numeric"});
+const fmtCurta=new Intl.DateTimeFormat("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+function diasAte(iso){return Math.round((parseISO(iso)-hoje())/864e5)}
+function relTxt(n){
+  if(n===0) return {t:"Começa hoje",c:"late"};
+  if(n<0) return {t:`Iniciou há ${-n} dia${n===-1?"":"s"}`,c:"late"};
+  if(n<=7) return {t:`Começa em ${n} dia${n===1?"":"s"}`,c:"soon"};
+  return {t:`Começa em ${n} dias`,c:""};
+}
+
+function ordenar(a,b){
+  return a.inicio.localeCompare(b.inicio)
+    || (TURNO_ORDEM[a.turno.toLowerCase()]??9)-(TURNO_ORDEM[b.turno.toLowerCase()]??9)
+    || a.curso.localeCompare(b.curso,"pt-BR")
+    || grupoNum(a.grupo)-grupoNum(b.grupo);
+}
+function stOf(t){return (state[idOf(t)]||{}).status||"pendente"}
+
+function cardHTML(t,prio){
+  const id=idOf(t), s=state[id]||{}, st=s.status||"pendente", key=id.replace(/[^a-z0-9]/g,"_");
+  const radios=Object.entries(STATUS).map(([v,l])=>`
+    <input type="radio" name="st_${key}" id="st_${key}_${v}" value="${v}" ${st===v?"checked":""} data-id="${esc(id)}">
+    <label for="st_${key}_${v}"><span class="box"></span>${l}</label>`).join("");
+  const nota= st==="parcial" ? `<label class="note"><span>O que falta entregar?</span>
+     <textarea id="nt_${key}" data-note="${esc(id)}" placeholder="Ex.: faltam 5 apostilas e 2 jalecos">${esc(s.nota||"")}</textarea></label>`
+     : (st==="entregue" && s.nota ? `<div class="stamp">Obs.: ${esc(s.nota)}</div>`:"");
+  const stamp= s.em && st!=="pendente" ? `<div class="stamp">${STATUS[st]} em ${fmtCurta.format(new Date(s.em))}</div>`:"";
+  return `<article class="card s-${st}">
+    <div class="card-top"><h3>${esc(t.curso)}</h3><div class="card-tools">${prio?`<span class="prio">#${prio}</span>`:""}<button type="button" class="del" data-del="${esc(id)}" aria-label="Remover turma">Remover</button></div></div>
+    <div class="meta"><span class="tag mono">${esc(t.grupo)}</span><span class="tag">${esc(t.turno)}</span><span class="tag">Início ${parseISO(t.inicio).toLocaleDateString("pt-BR")}</span></div>
+    <div class="status" role="radiogroup" aria-label="Status do kit">${radios}</div>
+    ${nota}${stamp}
+  </article>`;
+}
+
+function passa(t){
+  const q=filtro.q.trim().toLowerCase();
+  if(q && !(t.curso+" "+t.grupo+" "+t.turno).toLowerCase().includes(q)) return false;
+  if(filtro.curso && t.curso!==filtro.curso) return false;
+  if(filtro.turno && t.turno!==filtro.turno) return false;
+  return true;
+}
+
+function render(){
+  const all=[...turmas].sort(ordenar);
+  const c={pendente:0,parcial:0,entregue:0};
+  all.forEach(t=>c[stOf(t)]++);
+  $("#n-all").textContent=all.length; $("#n-pend").textContent=c.pendente; $("#n-parc").textContent=c.parcial; $("#n-ok").textContent=c.entregue;
+  const tot=all.length||1;
+  $("#bar-ok").style.width=(c.entregue/tot*100)+"%"; $("#bar-warn").style.width=(c.parcial/tot*100)+"%";
+
+  const abertas=all.filter(t=>stOf(t)!=="entregue");
+  const prioMap=new Map(abertas.map((t,i)=>[idOf(t),i+1]));
+  const fila=abertas.filter(t=>passa(t)&&(!filtro.st||stOf(t)===filtro.st));
+
+  const porDia=new Map();
+  fila.forEach(t=>{if(!porDia.has(t.inicio))porDia.set(t.inicio,[]);porDia.get(t.inicio).push(t)});
+  let html="";
+  porDia.forEach((lista,dia)=>{
+    const r=relTxt(diasAte(dia));
+    html+=`<div class="day"><div class="day-head"><span class="date">${fmtData.format(parseISO(dia))}</span>
+      <span class="rel ${r.c}">${r.t}</span><span class="line"></span><span class="cnt">${lista.length} turma${lista.length>1?"s":""}</span></div>
+      <div class="grid">${lista.map(t=>cardHTML(t,prioMap.get(idOf(t)))).join("")}</div></div>`;
+  });
+  if(!html){
+    html= abertas.length===0
+      ? `<div class="empty"><strong>Todos os kits foram entregues.</strong><br>As turmas estão na seção "Kits entregues" abaixo.</div>`
+      : `<div class="empty">Nenhuma turma corresponde aos filtros.</div>`;
+  }
+  $("#queue").innerHTML=html;
+
+  const feitas=all.filter(t=>stOf(t)==="entregue"&&passa(t));
+  $("#done-count").textContent=all.length-abertas.length;
+  $("#done-grid").innerHTML=feitas.length?feitas.map(t=>cardHTML(t,0)).join(""):`<div class="empty" style="grid-column:1/-1">Nenhum kit entregue ainda.</div>`;
+
+  const cursos=[...new Set(all.map(t=>t.curso))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
+  $("#lista-cursos").innerHTML=cursos.map(x=>`<option value="${esc(x)}">`).join("");
+  const sel=$("#f-curso"), cur=sel.value;
+  sel.innerHTML=`<option value="">Todos os cursos</option>`+cursos.map(x=>`<option ${x===cur?"selected":""}>${esc(x)}</option>`).join("");
+}
+
+function setStatus(id,st){
+  const prev=state[id]||{};
+  state[id]={...prev,status:st,em:Date.now()};
+  if(st==="pendente") delete state[id].em;
+  save(KEY_STATE,state);
+  render();
+  const t=turmas.find(x=>idOf(x)===id);
+  if(st==="entregue"&&t) toast(`${t.curso} ${t.grupo} movida para "Kits entregues"`);
+}
+
+/* adicionar turma */
+$("#add-form").addEventListener("submit",e=>{
+  e.preventDefault();
+  const err=$("#add-err");err.hidden=true;
+  const t={curso:$("#add-curso").value.trim().replace(/\s+/g," "),grupo:$("#add-grupo").value.trim().toUpperCase(),inicio:$("#add-data").value,turno:$("#add-turno").value};
+  const falta=[!t.curso&&"curso",!t.grupo&&"grupo",!t.inicio&&"data de início"].filter(Boolean);
+  if(falta.length){err.textContent="Preencha: "+falta.join(", ")+".";err.hidden=false;return}
+  const existente=turmas.find(x=>x.curso.toLowerCase()===t.curso.toLowerCase());
+  if(existente) t.curso=existente.curso;
+  if(turmas.some(x=>idOf(x)===idOf(t))){err.textContent=`${t.curso} ${t.grupo} (${t.turno}) já está cadastrada.`;err.hidden=false;return}
+  turmas=[...turmas,t];save(KEY_DATA,turmas);render();
+  $("#add-grupo").value="";$("#add-grupo").focus();
+  toast(`${t.curso} ${t.grupo} adicionada à fila`);
+});
+
+$("#add-form").addEventListener("input",()=>{$("#add-err").hidden=true});
+
+/* remover turma: primeiro toque arma, segundo confirma */
+let armado=null,armTimer;
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-del]");if(!b)return;
+  const id=b.dataset.del;
+  if(armado!==id){
+    document.querySelectorAll(".del.armed").forEach(x=>{x.classList.remove("armed");x.textContent="Remover"});
+    armado=id;b.classList.add("armed");b.textContent="Toque de novo para remover";
+    clearTimeout(armTimer);armTimer=setTimeout(()=>{armado=null;b.classList.remove("armed");b.textContent="Remover"},4000);
+    return;
+  }
+  armado=null;clearTimeout(armTimer);
+  const t=turmas.find(x=>idOf(x)===id);
+  turmas=turmas.filter(x=>idOf(x)!==id);delete state[id];
+  save(KEY_DATA,turmas);save(KEY_STATE,state);render();
+  if(t)toast(`${t.curso} ${t.grupo} removida`);
+});
+
+let tt;function toast(m){const el=$("#toast");el.textContent=m;el.classList.add("show");clearTimeout(tt);tt=setTimeout(()=>el.classList.remove("show"),2600)}
+
+document.addEventListener("change",e=>{
+  const el=e.target;
+  if(el.matches('.status input[type="radio"]')) setStatus(el.dataset.id,el.value);
+});
+document.addEventListener("input",e=>{
+  const el=e.target;
+  if(el.matches("textarea[data-note]")){const id=el.dataset.note;state[id]={...(state[id]||{status:"parcial"}),nota:el.value};save(KEY_STATE,state)}
+});
+$("#q").addEventListener("input",e=>{filtro.q=e.target.value;render()});
+$("#f-curso").addEventListener("change",e=>{filtro.curso=e.target.value;render()});
+$("#f-turno").addEventListener("change",e=>{filtro.turno=e.target.value;render()});
+document.querySelectorAll(".chip").forEach(b=>b.addEventListener("click",()=>{
+  filtro.st=b.dataset.st;document.querySelectorAll(".chip").forEach(x=>x.setAttribute("aria-pressed",x===b));render();
+}));
+
+/* tema */
+function applyTheme(t){if(t)document.documentElement.dataset.theme=t;else delete document.documentElement.dataset.theme}
+applyTheme(load(KEY_THEME,""));
+$("#btn-theme").addEventListener("click",()=>{
+  const dark=document.documentElement.dataset.theme? document.documentElement.dataset.theme==="dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  const n=dark?"light":"dark";applyTheme(n);save(KEY_THEME,n);
+});
+
+/* backup */
+$("#btn-export").addEventListener("click",()=>{
+  const blob=new Blob([JSON.stringify({app:"propag-kits",versao:2,exportadoEm:new Date().toISOString(),turmas,status:state},null,2)],{type:"application/json"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`kits-propag-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);toast("Backup exportado");
+});
+$("#btn-restore").addEventListener("click",()=>$("#file-json").click());
+$("#file-json").addEventListener("change",async e=>{
+  const f=e.target.files[0];if(!f)return;
+  try{const d=JSON.parse(await f.text());if(!Array.isArray(d.turmas)||typeof d.status!=="object")throw 0;
+    turmas=d.turmas;state=d.status;save(KEY_DATA,turmas);save(KEY_STATE,state);render();toast("Backup restaurado");}
+  catch(_){toast("Arquivo inválido. Escolha um backup .json exportado por este app.")}
+  e.target.value="";
+});
+
+/* importar xlsx (SheetJS carregado sob demanda) */
+function loadXLSX(){return window.XLSX?Promise.resolve():new Promise((ok,err)=>{const s=document.createElement("script");
+  s.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";s.onload=ok;s.onerror=err;document.head.appendChild(s)})}
+const norm=s=>String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().trim();
+function toISO(v){
+  if(v instanceof Date) return `${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,"0")}-${String(v.getDate()).padStart(2,"0")}`;
+  if(typeof v==="number"){const d=new Date(Math.round((v-25569)*864e5));return d.toISOString().slice(0,10)}
+  const m=String(v).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);if(m)return `${m[3]}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`;
+  const i=String(v).match(/\d{4}-\d{2}-\d{2}/);return i?i[0]:null;
+}
+$("#btn-import").addEventListener("click",()=>$("#file-xlsx").click());
+$("#file-xlsx").addEventListener("change",async e=>{
+  const f=e.target.files[0];if(!f)return;
+  try{
+    await loadXLSX();
+    const wb=XLSX.read(await f.arrayBuffer(),{type:"array",cellDates:true});
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:true});
+    const head=(rows[0]||[]).map(norm);
+    const col=(...n)=>head.findIndex(h=>n.some(x=>h.startsWith(x)));
+    const iC=col("curso","cuso"),iG=col("grupo","turma"),iD=col("data"),iT=col("turno");
+    if(iC<0||iG<0||iD<0) throw new Error("cols");
+    const novas=rows.slice(1).filter(r=>r[iC]&&r[iG]&&r[iD]).map(r=>({curso:String(r[iC]).trim(),grupo:String(r[iG]).trim(),inicio:toISO(r[iD]),turno:iT>=0?String(r[iT]||"").trim():""})).filter(t=>t.inicio);
+    if(!novas.length) throw new Error("vazio");
+    turmas=novas;save(KEY_DATA,turmas);render();
+    toast(`${novas.length} turmas importadas. Os status já marcados foram mantidos.`);
+  }catch(err){
+    toast(err&&err.message==="cols"?"A planilha precisa das colunas Curso, Grupo, Data de Início e Turno.":"Não foi possível ler a planilha. Verifique o arquivo e a conexão com a internet.");
+  }
+  e.target.value="";
+});
+
+/* limpar com confirmação na própria página */
+function askReset(){
+  const z=$("#reset-zone");
+  z.innerHTML=`<div class="confirm">Isso volta todas as turmas para "Aguardando". Confirmar?
+    <button type="button" id="rs-yes" class="primary">Sim, limpar</button><button type="button" id="rs-no">Cancelar</button></div>`;
+  const back=()=>{z.innerHTML=`<button id="btn-reset" type="button" class="danger-txt">Limpar todos os status</button>`;z.querySelector("#btn-reset").addEventListener("click",askReset)};
+  z.querySelector("#rs-no").onclick=back;
+  z.querySelector("#rs-yes").onclick=()=>{state={};save(KEY_STATE,state);render();toast("Status limpos");back()};
+}
+$("#btn-reset").addEventListener("click",askReset);
+
+$("#today-line").textContent=`Turmas em ordem de prioridade pela data de início · Hoje: ${hoje().toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"})}`;
+render();
+})();
+</script>
+</body>
+</html>
